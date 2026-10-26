@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-26
+
 ### Added
 
 - SQL in Gladys: your queries on a PostgreSQL, MariaDB or MySQL database
@@ -30,3 +32,6 @@ the notes of the version's GitHub Release.
   query.
 - "Test the connection", TLS (any certificate, or a valid one), texts and
   documentation in English, French, German and Spanish.
+
+[Unreleased]: https://github.com/guim31/gladys-sql/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/guim31/gladys-sql/releases/tag/v1.0.0
