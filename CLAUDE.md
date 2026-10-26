@@ -9,7 +9,8 @@ A Gladys Assistant **external integration**: a Node.js service (Node 22+, ESM,
 no build step) that runs in its own sandboxed Docker container and talks to
 Gladys through
 [`@gladysassistant/integration-sdk`](https://github.com/GladysAssistant/integration-sdk-js),
-its only runtime dependency. It started from the official JavaScript template.
+with `pg` and `mysql2` as its other runtime dependencies (in `dependencies`:
+the image installs no dev dependency). It started from the official JavaScript template.
 
 ## Commands
 
@@ -32,15 +33,21 @@ pushing.
 
 ```
 index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
+src/app.js                        registers every SDK handler on the hub (tests use it too)
+src/hub.js                        timer, reads, states, scene events, configuration actions
+src/sql/guard.js                  read-only guard: a single SELECT, literals and comments blanked
+src/sql/client.js                 pg / mysql2: one connection per read, read-only transaction, error kinds
+src/queries.js                    the queries (types, intervals, value of the first row)
+src/devices.js                    the database device (reachable, version, one feature per query)
+src/scenes.js                     scene action `read_query`
+src/widgets.js                    dashboard widget `values`
+src/texts.js                      every text sent to Gladys, in en / fr / de / es
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
+src/store.js, src/logs.js         /data persistence, one log line per failure and recovery
 gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
-test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
+docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys, same sections
+test/                             node --test, SDK's fake Gladys + fake drivers (test/helpers)
+test/fixtures/real                answers recorded from PostgreSQL 17, MariaDB 11, MySQL 8
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -70,8 +77,9 @@ test/                             node --test, against the SDK's fake Gladys (in
   `type: "provider"`: 5.1.0). `test/manifest.test.js` ties the manifest to the
   code (defaults, action, scene and widget handlers): change both sides
   together.
-- **User-facing text** is bilingual (English and French): action messages,
-  manifest texts, and `docs/en.md` / `docs/fr.md`, kept in sync.
+- **User-facing text** exists in English, French, German and Spanish: action
+  messages, manifest texts, feature names, and `docs/{en,fr,de,es}.md`, kept in
+  sync (`test/i18n.test.js`).
 - **Style.** Prettier formats, ESLint catches mistakes. Comments explain why,
   in English. Tests never touch the network.
 
@@ -233,3 +241,37 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Docs `en`, `fr`, `de`, `es` avec les mêmes sections.
 - Chauffe, ouverture, sécurité : ne rien rendre pilotable « comme un thermostat » ou par un assistant
   vocal quand une erreur serait dangereuse (leçon d'OctoPrint).
+
+## SQL (propre à ce dépôt)
+
+- **Lecture seule à trois étages**, à garder tous les trois : le garde-fou (`src/sql/guard.js`) refuse tout
+  ce qui n'est pas un seul `SELECT` / `WITH … SELECT` et les mots qui écrivent, verrouillent ou agissent sur
+  le serveur ; la transaction en lecture seule (`BEGIN READ ONLY`, session PostgreSQL en
+  `default_transaction_read_only`, `START TRANSACTION READ ONLY` + `SET SESSION TRANSACTION READ ONLY`
+  côté MariaDB / MySQL), annulée par `ROLLBACK` ; l'utilisateur en lecture seule de la doc. Le garde-fou lit
+  le texte comme le serveur (littéraux, identifiants entre guillemets, commentaires, dollar-quotes PG,
+  `\` échappé seulement en MySQL et dans les `E'…'` PG, `-- ` avec espace en MySQL) et refuse ce dont il
+  n'est pas sûr (`/*! … */` exécuté par MySQL, littéral non fermé, **toute barre oblique inverse** : son sens
+  dépend de `NO_BACKSLASH_ESCAPES` / `standard_conforming_strings`). Pièges relevés en relecture : MySQL
+  termine un `--` sur **tout caractère de contrôle** (pas seulement l'espace) ; PostgreSQL accepte des
+  lettres non ASCII et `$` dans les identifiants et les étiquettes de dollar-quote ; les fonctions se
+  bloquent **par famille** (`dblink*`, `pg_ls_*`, `lo_*`…), `\b` voyant `_` comme une lettre ; certaines
+  (`pg_read_file`, `dblink`, `LOAD_FILE`, `INTO OUTFILE`) échappent à la transaction en lecture seule.
+- **PostgreSQL** : `pg` en protocole étendu (`queryMode: 'extended'`), qui refuse une deuxième instruction ;
+  sans `values`, `pg` passe sinon en protocole simple, qui les accepte. `statement_timeout` côté serveur,
+  `query_timeout` côté client (+2 s).
+- **MariaDB / MySQL** : `mysql2` sans `multipleStatements`, `DECIMAL`/`BIGINT` en texte (`bigNumberStrings`),
+  dates en texte (`dateStrings`). Délai serveur : `max_statement_time` en **secondes** pour MariaDB,
+  `max_execution_time` en **ms** pour MySQL (choisi d'après `version()`). Sous MySQL, `SLEEP()` interrompu par
+  `max_execution_time` **renvoie 1 sans erreur** : tester le délai avec une vraie requête lente.
+- Erreurs réelles relevées : MySQL et MariaDB répondent `1044` (pas `1049`) pour une base inconnue quand
+  l'utilisateur n'a de droit sur aucune base de ce nom ; écrire dans une transaction en lecture seule donne
+  `25006` (PG) et `1792` (MariaDB, MySQL). Un `SET` via `mysql2` n'a pas de `fields` (`undefined`).
+- Classer une erreur d'abord par son code serveur (SQLSTATE, errno) : un message « column "certificate" »
+  n'est pas une erreur TLS. Une base en panne n'est relue qu'à l'intervalle de la configuration, sinon les
+  requêtes dues à chaque tick (15 s) atteignent `DOWN_AFTER_READS` en 30 s.
+- Une connexion par lecture, fermée aussitôt (pas de pool) : pas de connexion orpheline entre deux lectures,
+  un délai dépassé n'empoisonne pas la suivante.
+- Un seul appareil, d'identifiant fixe (`database:main`) : changer d'hôte garde l'historique. Une
+  fonctionnalité par requête, clé `<type>_<id>` (l'id = nom haché) : changer le type crée une nouvelle
+  fonctionnalité (« Mettre à jour » dans Découverte).
