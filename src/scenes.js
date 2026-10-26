@@ -1,41 +1,52 @@
 // -----------------------------------------------------------------------------
-// Scene actions (SDK v0.14+, Gladys 5.1+).
+// Scene action handlers (manifest `scene_actions`, Gladys 5.1+).
 //
-// A scene action is an OPERATION a scene author places in a scene, with
-// parameters and a result: "identify this device", "take a snapshot", "clean
-// these rooms". Each one is declared in the manifest `scene_actions` field
-// (key, label, `fields` in the config_schema grammar, scalar `outputs`) and
-// handled here, keyed by that same `key`; index.js registers every entry with
-// `gladys.onSceneAction(key, ...)`.
-//
-// Scene TRIGGERS are the other direction ("this happened"): they are fired by
-// the device that observes the event, see src/devices/motionSensor.js.
-//
-// The rules that matter:
-//   - `fields` arrive RESOLVED: scene variables substituted, defaults applied,
-//     validated by the core; a `"source": "devices"` field is the chosen
-//     device external_id;
-//   - resolve an object of the declared `outputs` (scalars only), readable by
-//     the following actions of the scene, or `undefined` for none. Keys not
-//     declared in the manifest are dropped by the core;
-//   - throwing fails THIS action only: the scene logs it and continues. A
-//     scene action is never a condition: return an output and let the scene
-//     author gate on it;
-//   - never fire a scene event as a consequence of a received action: a scene
-//     bound to that event would loop through the integration.
+// The values of the queries are already device states (scene conditions,
+// "read a device value"), refreshed at their interval. This action reads one
+// now, in a scene: a figure fresh to the second before a message ("12 rows
+// added today"), or a one-off SELECT that is not worth a feature. The same
+// guard and read-only transaction apply.
 // -----------------------------------------------------------------------------
 
-import { createLogger } from '@gladysassistant/integration-sdk';
-import { signalDevice } from './devices/index.js';
-
-const logger = createLogger({ name: 'scenes' });
+import { MAX_QUERY_LENGTH, extractValue } from './queries.js';
+import { ACTION_TEXT, CONNECTION_TEXT, labelled, pick, problemText } from './texts.js';
+import { formatValue } from './widgets.js';
 
 export const SCENE_ACTIONS = {
-  // The ack is awaited under the action's `timeout_seconds` (15 s in the
-  // manifest), counted from the moment the scene reaches the action.
-  async identify_device(gladys, { fields, config }) {
-    logger.info(`Scene action identify_device <- ${fields.device}`);
-    const signalled = await signalDevice(gladys, fields.device, config);
-    return { signalled };
+  async read_query(hub, { fields = {} }) {
+    const language = hub.config?.language;
+    if (!hub.client) {
+      throw new Error(pick(hub.connectionStatus?.().message ?? CONNECTION_TEXT.noHost, language));
+    }
+    const typed = typeof fields.query === 'string' ? fields.query.trim() : '';
+    if (!typed || typed.length > MAX_QUERY_LENGTH) {
+      throw new Error(pick(ACTION_TEXT.noQuery, language));
+    }
+    // The name of a saved query (its column and type), or a SELECT (its first column, a number or a text).
+    const saved = hub.findQuery(typed);
+    const query = saved ?? { query: typed, column: '', type: 'text' };
+    let result;
+    try {
+      result = await hub.client.query(query.query);
+    } catch (err) {
+      throw new Error(labelled(saved?.name ?? 'SQL', problemText(err, language), language), {
+        cause: err,
+      });
+    }
+    const extracted = extractValue(result, query.column, query.type);
+    if (extracted.error) {
+      throw new Error(problemText({ value: extracted.error }, language));
+    }
+    const { value } = extracted;
+    if (value === null) {
+      return { value: 0, text: '' };
+    }
+    const number = typeof value === 'number' ? value : Number(value);
+    return {
+      // Not a number (a text): 0, and `text` holds it.
+      value:
+        Number.isFinite(number) && String(value).trim() !== '' ? Math.round(number * 100) / 100 : 0,
+      text: saved ? formatValue(saved.type, value, language) : String(value),
+    };
   },
 };

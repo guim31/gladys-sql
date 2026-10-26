@@ -1,0 +1,157 @@
+{
+  "engine": "mysql",
+  "version": "11.8.9-MariaDB-ubu2404",
+  "queries": {
+    "last": {
+      "sql": "SELECT temperature FROM measures ORDER BY created_at DESC LIMIT 1",
+      "rows": [
+        {
+          "temperature": "21.30"
+        }
+      ],
+      "columns": ["temperature"]
+    },
+    "avg": {
+      "sql": "SELECT ROUND(AVG(temperature), 2) AS avg_temp, COUNT(*) AS n FROM measures WHERE room = 'living'",
+      "rows": [
+        {
+          "avg_temp": "20.90",
+          "n": "2"
+        }
+      ],
+      "columns": ["avg_temp", "n"]
+    },
+    "humidity": {
+      "sql": "SELECT humidity FROM measures ORDER BY id DESC LIMIT 1",
+      "rows": [
+        {
+          "humidity": 47
+        }
+      ],
+      "columns": ["humidity"]
+    },
+    "count": {
+      "sql": "SELECT COUNT(*) AS `rows` FROM events",
+      "rows": [
+        {
+          "rows": "3"
+        }
+      ],
+      "columns": ["rows"]
+    },
+    "room": {
+      "sql": "SELECT room, temperature FROM measures ORDER BY created_at DESC LIMIT 1",
+      "rows": [
+        {
+          "room": "living",
+          "temperature": "21.30"
+        }
+      ],
+      "columns": ["room", "temperature"]
+    },
+    "backup": {
+      "sql": "SELECT ok FROM events WHERE kind = 'backup' ORDER BY id DESC LIMIT 1",
+      "rows": [
+        {
+          "ok": 1
+        }
+      ],
+      "columns": ["ok"]
+    },
+    "size": {
+      "sql": "SELECT ROUND(SUM(data_length + index_length) / 1000000, 2) AS mb FROM information_schema.tables WHERE table_schema = DATABASE()",
+      "rows": [
+        {
+          "mb": "0.03"
+        }
+      ],
+      "columns": ["mb"]
+    },
+    "date": {
+      "sql": "SELECT MAX(created_at) AS last FROM measures",
+      "rows": [
+        {
+          "last": "2026-10-20 08:30:00"
+        }
+      ],
+      "columns": ["last"]
+    },
+    "none": {
+      "sql": "SELECT temperature FROM measures WHERE room = 'attic'",
+      "rows": [],
+      "columns": ["temperature"]
+    },
+    "nullmax": {
+      "sql": "SELECT MAX(temperature) FROM measures WHERE room = 'attic'",
+      "rows": [
+        {
+          "MAX(temperature)": null
+        }
+      ],
+      "columns": ["MAX(temperature)"]
+    },
+    "syntax": {
+      "sql": "SELECT FROM WHERE",
+      "error": {
+        "code": "ER_PARSE_ERROR",
+        "errno": 1064,
+        "sqlState": "42000",
+        "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'FROM WHERE' at line 1"
+      }
+    },
+    "notable": {
+      "sql": "SELECT * FROM nothing",
+      "error": {
+        "code": "ER_NO_SUCH_TABLE",
+        "errno": 1146,
+        "sqlState": "42S02",
+        "message": "Table 'home.nothing' doesn't exist"
+      }
+    },
+    "writeInRo": {
+      "sql": "INSERT INTO events (kind) VALUES ('x')",
+      "error": {
+        "code": "ER_TABLEACCESS_DENIED_ERROR",
+        "errno": 1142,
+        "sqlState": "42000",
+        "message": "INSERT command denied to user 'reader'@'192.0.2.1' for table `home`.`events`"
+      }
+    },
+    "timeout": {
+      "sql": "SELECT COUNT(*) FROM information_schema.columns a, information_schema.columns b, information_schema.columns c",
+      "error": {
+        "errno": 1969,
+        "sqlState": "70100",
+        "message": "Query execution was interrupted (max_statement_time exceeded)"
+      }
+    },
+    "writeInRoWriter": {
+      "sql": "INSERT INTO events (kind) VALUES ('x')",
+      "error": {
+        "code": "ER_CANT_EXECUTE_IN_READ_ONLY_TRANSACTION",
+        "errno": 1792,
+        "sqlState": "25006",
+        "message": "Cannot execute statement in a READ ONLY transaction"
+      }
+    }
+  },
+  "connectErrors": {
+    "auth": {
+      "code": "ER_ACCESS_DENIED_ERROR",
+      "errno": 1045,
+      "sqlState": "28000",
+      "message": "Access denied for user 'reader'@'192.0.2.1' (using password: YES)"
+    },
+    "database": {
+      "code": "ER_DBACCESS_DENIED_ERROR",
+      "errno": 1044,
+      "sqlState": "42000",
+      "message": "Access denied for user 'reader'@'%' to database 'nope'"
+    },
+    "refused": {
+      "code": "ECONNREFUSED",
+      "errno": -111,
+      "message": "connect ECONNREFUSED 192.0.2.1:1"
+    }
+  }
+}

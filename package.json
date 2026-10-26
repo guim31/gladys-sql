@@ -1,8 +1,8 @@
 {
-  "name": "gladys-integration-template-js",
+  "name": "gladys-sql",
   "version": "1.0.0",
   "private": true,
-  "description": "Official starter template to build an external integration for Gladys Assistant with the JavaScript SDK.",
+  "description": "SQL for Gladys Assistant: read-only PostgreSQL, MariaDB and MySQL queries as sensors, scene triggers on failures.",
   "type": "module",
   "main": "index.js",
   "scripts": {
@@ -16,7 +16,9 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@gladysassistant/integration-sdk": "^0.16.0"
+    "@gladysassistant/integration-sdk": "^0.16.0",
+    "mysql2": "^3.24.6",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

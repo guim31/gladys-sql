@@ -1,177 +1,957 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "SQL",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Your SQL queries on PostgreSQL, MariaDB or MySQL as Gladys sensors, read-only.",
+    "fr": "Vos requêtes SQL sur PostgreSQL, MariaDB ou MySQL en capteurs Gladys, en lecture seule.",
+    "de": "Deine SQL-Abfragen auf PostgreSQL, MariaDB oder MySQL als Gladys-Sensoren, nur lesend.",
+    "es": "Sus consultas SQL en PostgreSQL, MariaDB o MySQL como sensores de Gladys, solo lectura."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
+  "docker_image": "ghcr.io/guim31/gladys-sql:1.0.0",
   "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-sql/main/cover.png",
+  "categories": ["servers"],
+  "transports": ["local"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": {
+        "en": "Your database",
+        "fr": "Votre base de données",
+        "de": "Deine Datenbank",
+        "es": "Su base de datos"
+      },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "Enter the access to your database, ideally a user who may only read. Then add your queries with \"Add a query\" below, and the database from the Discover tab.",
+        "fr": "Saisissez les accès à votre base, idéalement un utilisateur qui ne peut que lire. Ajoutez ensuite vos requêtes avec « Ajouter une requête » ci-dessous, puis la base depuis l'onglet Découverte.",
+        "de": "Gib die Zugangsdaten deiner Datenbank ein, am besten einen Benutzer, der nur lesen darf. Füge dann deine Abfragen mit „Abfrage hinzufügen“ unten hinzu und die Datenbank im Tab „Entdecken“.",
+        "es": "Introduzca los accesos a su base de datos, idealmente un usuario que solo pueda leer. Después añada sus consultas con «Añadir una consulta» más abajo, y la base de datos desde la pestaña Descubrir."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://github.com/guim31/gladys-sql/blob/main/docs/en.md",
+          "label": {
+            "en": "Setup guide",
+            "fr": "Guide d'installation",
+            "de": "Installationsanleitung",
+            "es": "Guía de instalación"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
-      "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
-    },
-    {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
-    },
-    {
-      "key": "unit",
+      "key": "engine",
       "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
+      "label": {
+        "en": "Database type",
+        "fr": "Type de base",
+        "de": "Datenbanktyp",
+        "es": "Tipo de base de datos"
+      },
       "required": false,
-      "default": "celsius",
+      "default": "postgres",
       "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
+        {
+          "value": "postgres",
+          "label": {
+            "en": "PostgreSQL",
+            "fr": "PostgreSQL",
+            "de": "PostgreSQL",
+            "es": "PostgreSQL"
+          }
+        },
+        {
+          "value": "mysql",
+          "label": {
+            "en": "MariaDB or MySQL",
+            "fr": "MariaDB ou MySQL",
+            "de": "MariaDB oder MySQL",
+            "es": "MariaDB o MySQL"
+          }
+        }
       ]
     },
     {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "key": "host",
+      "type": "string",
+      "label": {
+        "en": "Address",
+        "fr": "Adresse",
+        "de": "Adresse",
+        "es": "Dirección"
+      },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+        "en": "IP address or host name of the database server.",
+        "fr": "Adresse IP ou nom du serveur de base de données.",
+        "de": "IP-Adresse oder Hostname des Datenbankservers.",
+        "es": "Dirección IP o nombre del servidor de base de datos."
+      },
+      "placeholder": {
+        "en": "e.g. 192.168.1.2",
+        "fr": "ex. 192.168.1.2",
+        "de": "z. B. 192.168.1.2",
+        "es": "p. ej. 192.168.1.2"
+      },
+      "required": true
+    },
+    {
+      "key": "port",
+      "type": "string",
+      "label": {
+        "en": "Port",
+        "fr": "Port",
+        "de": "Port",
+        "es": "Puerto"
+      },
+      "description": {
+        "en": "Empty: 5432 for PostgreSQL, 3306 for MariaDB and MySQL.",
+        "fr": "Vide : 5432 pour PostgreSQL, 3306 pour MariaDB et MySQL.",
+        "de": "Leer: 5432 für PostgreSQL, 3306 für MariaDB und MySQL.",
+        "es": "Vacío: 5432 para PostgreSQL, 3306 para MariaDB y MySQL."
+      },
+      "placeholder": {
+        "en": "e.g. 5432",
+        "fr": "ex. 5432",
+        "de": "z. B. 5432",
+        "es": "p. ej. 5432"
+      },
+      "required": false
+    },
+    {
+      "key": "database",
+      "type": "string",
+      "label": {
+        "en": "Database",
+        "fr": "Base de données",
+        "de": "Datenbank",
+        "es": "Base de datos"
+      },
+      "placeholder": {
+        "en": "e.g. home",
+        "fr": "ex. maison",
+        "de": "z. B. home",
+        "es": "p. ej. casa"
+      },
+      "required": true
+    },
+    {
+      "key": "username",
+      "type": "string",
+      "label": {
+        "en": "User",
+        "fr": "Utilisateur",
+        "de": "Benutzer",
+        "es": "Usuario"
+      },
+      "description": {
+        "en": "Create one with read rights only: see the setup guide.",
+        "fr": "Créez-en un aux seuls droits de lecture : voir le guide d'installation.",
+        "de": "Lege einen mit reinen Leserechten an: Siehe die Installationsanleitung.",
+        "es": "Cree uno con permisos de solo lectura: consulte la guía de instalación."
+      },
+      "required": true
+    },
+    {
+      "key": "password",
+      "type": "secret",
+      "label": {
+        "en": "Password",
+        "fr": "Mot de passe",
+        "de": "Passwort",
+        "es": "Contraseña"
+      },
+      "required": false
+    },
+    {
+      "key": "tls",
+      "type": "select",
+      "label": {
+        "en": "Encryption (TLS)",
+        "fr": "Chiffrement (TLS)",
+        "de": "Verschlüsselung (TLS)",
+        "es": "Cifrado (TLS)"
+      },
+      "description": {
+        "en": "Required for a database outside your home network.",
+        "fr": "Indispensable pour une base hors de votre réseau local.",
+        "de": "Unverzichtbar für eine Datenbank außerhalb deines Heimnetzes.",
+        "es": "Imprescindible para una base de datos fuera de su red local."
       },
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "default": "off",
+      "options": [
+        {
+          "value": "off",
+          "label": {
+            "en": "No",
+            "fr": "Non",
+            "de": "Nein",
+            "es": "No"
+          }
+        },
+        {
+          "value": "require",
+          "label": {
+            "en": "Yes, any certificate (self-signed)",
+            "fr": "Oui, tout certificat (auto-signé)",
+            "de": "Ja, jedes Zertifikat (selbstsigniert)",
+            "es": "Sí, cualquier certificado (autofirmado)"
+          }
+        },
+        {
+          "value": "verify",
+          "label": {
+            "en": "Yes, with a valid certificate",
+            "fr": "Oui, avec un certificat valide",
+            "de": "Ja, mit gültigem Zertifikat",
+            "es": "Sí, con un certificado válido"
+          }
+        }
+      ]
+    },
+    {
+      "key": "options",
+      "type": "section",
+      "label": {
+        "en": "Options",
+        "fr": "Options",
+        "de": "Optionen",
+        "es": "Opciones"
+      }
+    },
+    {
+      "key": "poll_interval",
+      "type": "select",
+      "label": {
+        "en": "Refresh interval",
+        "fr": "Intervalle de rafraîchissement",
+        "de": "Aktualisierungsintervall",
+        "es": "Intervalo de actualización"
+      },
+      "description": {
+        "en": "Of the connection check, and of the queries without their own interval.",
+        "fr": "Du test de connexion, et des requêtes sans intervalle propre.",
+        "de": "Der Verbindungsprüfung und der Abfragen ohne eigenes Intervall.",
+        "es": "De la comprobación de la conexión, y de las consultas sin intervalo propio."
+      },
+      "required": false,
+      "default": "60",
+      "options": [
+        {
+          "value": "30",
+          "label": {
+            "en": "30 seconds",
+            "fr": "30 secondes",
+            "de": "30 Sekunden",
+            "es": "30 segundos"
+          }
+        },
+        {
+          "value": "60",
+          "label": {
+            "en": "1 minute",
+            "fr": "1 minute",
+            "de": "1 Minute",
+            "es": "1 minuto"
+          }
+        },
+        {
+          "value": "120",
+          "label": {
+            "en": "2 minutes",
+            "fr": "2 minutes",
+            "de": "2 Minuten",
+            "es": "2 minutos"
+          }
+        },
+        {
+          "value": "300",
+          "label": {
+            "en": "5 minutes",
+            "fr": "5 minutes",
+            "de": "5 Minuten",
+            "es": "5 minutos"
+          }
+        },
+        {
+          "value": "600",
+          "label": {
+            "en": "10 minutes",
+            "fr": "10 minutes",
+            "de": "10 Minuten",
+            "es": "10 minutos"
+          }
+        },
+        {
+          "value": "1800",
+          "label": {
+            "en": "30 minutes",
+            "fr": "30 minutes",
+            "de": "30 Minuten",
+            "es": "30 minutos"
+          }
+        },
+        {
+          "value": "3600",
+          "label": {
+            "en": "1 hour",
+            "fr": "1 heure",
+            "de": "1 Stunde",
+            "es": "1 hora"
+          }
+        }
+      ]
+    },
+    {
+      "key": "query_timeout",
+      "type": "select",
+      "label": {
+        "en": "Time limit per query",
+        "fr": "Délai maximal par requête",
+        "de": "Zeitlimit pro Abfrage",
+        "es": "Tiempo máximo por consulta"
+      },
+      "description": {
+        "en": "Beyond it, the database stops the query.",
+        "fr": "Au-delà, la base arrête la requête.",
+        "de": "Danach bricht die Datenbank die Abfrage ab.",
+        "es": "Pasado ese tiempo, la base de datos detiene la consulta."
+      },
+      "required": false,
+      "default": "10",
+      "options": [
+        {
+          "value": "5",
+          "label": {
+            "en": "5 seconds",
+            "fr": "5 secondes",
+            "de": "5 Sekunden",
+            "es": "5 segundos"
+          }
+        },
+        {
+          "value": "10",
+          "label": {
+            "en": "10 seconds",
+            "fr": "10 secondes",
+            "de": "10 Sekunden",
+            "es": "10 segundos"
+          }
+        },
+        {
+          "value": "30",
+          "label": {
+            "en": "30 seconds",
+            "fr": "30 secondes",
+            "de": "30 Sekunden",
+            "es": "30 segundos"
+          }
+        },
+        {
+          "value": "60",
+          "label": {
+            "en": "1 minute",
+            "fr": "1 minute",
+            "de": "1 Minute",
+            "es": "1 minuto"
+          }
+        }
+      ]
+    },
+    {
+      "key": "language",
+      "type": "select",
+      "label": {
+        "en": "Language of the messages",
+        "fr": "Langue des messages",
+        "de": "Sprache der Meldungen",
+        "es": "Idioma de los mensajes"
+      },
+      "description": {
+        "en": "Language of the feature names, scene results and messages.",
+        "fr": "Langue des noms de fonctionnalités, des résultats de scène et des messages.",
+        "de": "Sprache der Funktionsnamen, Szenenergebnisse und Meldungen.",
+        "es": "Idioma de los nombres de funciones, resultados de escenas y mensajes."
+      },
+      "required": false,
+      "default": "fr",
+      "options": [
+        {
+          "value": "en",
+          "label": {
+            "en": "English",
+            "fr": "Anglais",
+            "de": "Englisch",
+            "es": "Inglés"
+          }
+        },
+        {
+          "value": "fr",
+          "label": {
+            "en": "French",
+            "fr": "Français",
+            "de": "Französisch",
+            "es": "Francés"
+          }
+        },
+        {
+          "value": "de",
+          "label": {
+            "en": "German",
+            "fr": "Allemand",
+            "de": "Deutsch",
+            "es": "Alemán"
+          }
+        },
+        {
+          "value": "es",
+          "label": {
+            "en": "Spanish",
+            "fr": "Espagnol",
+            "de": "Spanisch",
+            "es": "Español"
+          }
+        }
+      ]
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
+      "key": "test_connection",
+      "label": {
+        "en": "Test the connection",
+        "fr": "Tester la connexion",
+        "de": "Verbindung testen",
+        "es": "Probar la conexión"
+      },
+      "timeout_seconds": 120
     },
     {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
+      "key": "add_query",
+      "label": {
+        "en": "Add a query",
+        "fr": "Ajouter une requête",
+        "de": "Abfrage hinzufügen",
+        "es": "Añadir una consulta"
+      },
+      "description": {
+        "en": "One feature per query, read in the first row. The same name again replaces the query.",
+        "fr": "Une fonctionnalité par requête, lue dans la première ligne. Le même nom remplace la requête.",
+        "de": "Eine Funktion pro Abfrage, aus der ersten Zeile gelesen. Derselbe Name ersetzt die Abfrage.",
+        "es": "Una función por consulta, leída en la primera fila. El mismo nombre reemplaza la consulta."
+      },
+      "timeout_seconds": 90,
       "fields": [
         {
-          "key": "device",
+          "key": "name",
+          "type": "string",
+          "label": {
+            "en": "Name",
+            "fr": "Nom",
+            "de": "Name",
+            "es": "Nombre"
+          },
+          "placeholder": {
+            "en": "e.g. Living room temperature",
+            "fr": "ex. Température du salon",
+            "de": "z. B. Temperatur Wohnzimmer",
+            "es": "p. ej. Temperatura del salón"
+          }
+        },
+        {
+          "key": "query",
+          "type": "string",
+          "label": {
+            "en": "SQL query (SELECT)",
+            "fr": "Requête SQL (SELECT)",
+            "de": "SQL-Abfrage (SELECT)",
+            "es": "Consulta SQL (SELECT)"
+          },
+          "description": {
+            "en": "A single SELECT or WITH … SELECT, nothing that writes.",
+            "fr": "Un seul SELECT ou WITH … SELECT, rien qui écrive.",
+            "de": "Ein einziges SELECT oder WITH … SELECT, nichts, was schreibt.",
+            "es": "Un solo SELECT o WITH … SELECT, nada que escriba."
+          },
+          "placeholder": {
+            "en": "e.g. SELECT count(*) FROM events",
+            "fr": "ex. SELECT count(*) FROM evenements",
+            "de": "z. B. SELECT count(*) FROM ereignisse",
+            "es": "p. ej. SELECT count(*) FROM eventos"
+          }
+        },
+        {
+          "key": "column",
+          "type": "string",
+          "label": {
+            "en": "Column (optional)",
+            "fr": "Colonne (facultatif)",
+            "de": "Spalte (optional)",
+            "es": "Columna (opcional)"
+          },
+          "description": {
+            "en": "Empty: the first column.",
+            "fr": "Vide : la première colonne.",
+            "de": "Leer: die erste Spalte.",
+            "es": "Vacío: la primera columna."
+          },
+          "placeholder": {
+            "en": "e.g. temperature",
+            "fr": "ex. temperature",
+            "de": "z. B. temperatur",
+            "es": "p. ej. temperatura"
+          }
+        },
+        {
+          "key": "type",
           "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
+          "label": {
+            "en": "Type",
+            "fr": "Type",
+            "de": "Typ",
+            "es": "Tipo"
+          },
+          "description": {
+            "en": "Empty: Number (no unit).",
+            "fr": "Vide : Nombre (sans unité).",
+            "de": "Leer: Zahl (ohne Einheit).",
+            "es": "Vacío: Número (sin unidad)."
+          },
+          "options": [
+            {
+              "value": "number",
+              "label": {
+                "en": "Number (no unit)",
+                "fr": "Nombre (sans unité)",
+                "de": "Zahl (ohne Einheit)",
+                "es": "Número (sin unidad)"
+              }
+            },
+            {
+              "value": "temperature",
+              "label": {
+                "en": "Temperature (°C)",
+                "fr": "Température (°C)",
+                "de": "Temperatur (°C)",
+                "es": "Temperatura (°C)"
+              }
+            },
+            {
+              "value": "humidity",
+              "label": {
+                "en": "Humidity (%)",
+                "fr": "Humidité (%)",
+                "de": "Luftfeuchtigkeit (%)",
+                "es": "Humedad (%)"
+              }
+            },
+            {
+              "value": "percent",
+              "label": {
+                "en": "Percentage (%)",
+                "fr": "Pourcentage (%)",
+                "de": "Prozent (%)",
+                "es": "Porcentaje (%)"
+              }
+            },
+            {
+              "value": "power",
+              "label": {
+                "en": "Power (W)",
+                "fr": "Puissance (W)",
+                "de": "Leistung (W)",
+                "es": "Potencia (W)"
+              }
+            },
+            {
+              "value": "energy",
+              "label": {
+                "en": "Energy (kWh)",
+                "fr": "Énergie (kWh)",
+                "de": "Energie (kWh)",
+                "es": "Energía (kWh)"
+              }
+            },
+            {
+              "value": "size",
+              "label": {
+                "en": "Size (MB)",
+                "fr": "Taille (Mo)",
+                "de": "Größe (MB)",
+                "es": "Tamaño (MB)"
+              }
+            },
+            {
+              "value": "text",
+              "label": {
+                "en": "Text",
+                "fr": "Texte",
+                "de": "Text",
+                "es": "Texto"
+              }
+            },
+            {
+              "value": "boolean",
+              "label": {
+                "en": "Yes / no (1/0, true/false)",
+                "fr": "Oui / non (1/0, true/false)",
+                "de": "Ja / nein (1/0, true/false)",
+                "es": "Sí / no (1/0, true/false)"
+              }
+            }
+          ]
+        },
+        {
+          "key": "interval",
+          "type": "select",
+          "label": {
+            "en": "Interval (optional)",
+            "fr": "Intervalle (facultatif)",
+            "de": "Intervall (optional)",
+            "es": "Intervalo (opcional)"
+          },
+          "description": {
+            "en": "Empty: the refresh interval of the configuration.",
+            "fr": "Vide : l'intervalle de rafraîchissement de la configuration.",
+            "de": "Leer: das Aktualisierungsintervall der Konfiguration.",
+            "es": "Vacío: el intervalo de actualización de la configuración."
+          },
+          "options": [
+            {
+              "value": "30",
+              "label": {
+                "en": "30 seconds",
+                "fr": "30 secondes",
+                "de": "30 Sekunden",
+                "es": "30 segundos"
+              }
+            },
+            {
+              "value": "60",
+              "label": {
+                "en": "1 minute",
+                "fr": "1 minute",
+                "de": "1 Minute",
+                "es": "1 minuto"
+              }
+            },
+            {
+              "value": "300",
+              "label": {
+                "en": "5 minutes",
+                "fr": "5 minutes",
+                "de": "5 Minuten",
+                "es": "5 minutos"
+              }
+            },
+            {
+              "value": "900",
+              "label": {
+                "en": "15 minutes",
+                "fr": "15 minutes",
+                "de": "15 Minuten",
+                "es": "15 minutos"
+              }
+            },
+            {
+              "value": "3600",
+              "label": {
+                "en": "1 hour",
+                "fr": "1 heure",
+                "de": "1 Stunde",
+                "es": "1 hora"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "remove_query",
+      "label": {
+        "en": "Remove a query",
+        "fr": "Supprimer une requête",
+        "de": "Abfrage entfernen",
+        "es": "Eliminar una consulta"
+      },
+      "description": {
+        "en": "Its feature stays in Gladys without new values: \"Update\" the database in the Discover tab.",
+        "fr": "Sa fonctionnalité reste dans Gladys sans nouvelle valeur : « Mettre à jour » la base dans l'onglet Découverte.",
+        "de": "Die Funktion der Abfrage bleibt ohne neue Werte in Gladys: Aktualisiere die Datenbank im Tab „Entdecken“.",
+        "es": "Su función queda en Gladys sin nuevos valores: «Actualizar» la base de datos en la pestaña Descubrir."
+      },
+      "timeout_seconds": 30,
+      "fields": [
+        {
+          "key": "name",
+          "type": "string",
+          "label": {
+            "en": "Name",
+            "fr": "Nom",
+            "de": "Name",
+            "es": "Nombre"
+          }
         }
       ]
     }
   ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "database_unreachable",
+      "label": {
+        "en": "The database is unreachable",
+        "fr": "La base est injoignable",
+        "de": "Die Datenbank ist nicht erreichbar",
+        "es": "La base de datos es inaccesible"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "Two reads in a row fail: no answer, access refused, database not found.",
+        "fr": "Deux lectures de suite échouent : pas de réponse, accès refusé, base introuvable.",
+        "de": "Zwei Lesevorgänge nacheinander schlagen fehl: keine Antwort, Zugriff verweigert, Datenbank nicht gefunden.",
+        "es": "Dos lecturas seguidas fallan: sin respuesta, acceso denegado, base de datos no encontrada."
+      },
+      "variables": [
+        {
+          "key": "error",
+          "type": "string",
+          "label": {
+            "en": "Error",
+            "fr": "Erreur",
+            "de": "Fehler",
+            "es": "Error"
+          }
+        },
+        {
+          "key": "error_kind",
+          "type": "string",
+          "label": {
+            "en": "Error key (unreachable, auth, database, tls)",
+            "fr": "Clé de l'erreur (unreachable, auth, database, tls)",
+            "de": "Fehlerschlüssel (unreachable, auth, database, tls)",
+            "es": "Clave del error (unreachable, auth, database, tls)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "database_back",
+      "label": {
+        "en": "The database answers again",
+        "fr": "La base répond de nouveau",
+        "de": "Die Datenbank antwortet wieder",
+        "es": "La base de datos responde de nuevo"
+      },
+      "description": {
+        "en": "After \"The database is unreachable\", a read works again.",
+        "fr": "Après « La base est injoignable », une lecture réussit de nouveau.",
+        "de": "Nach „Die Datenbank ist nicht erreichbar“ klappt ein Lesevorgang wieder.",
+        "es": "Después de «La base de datos es inaccesible», una lectura vuelve a funcionar."
+      },
+      "variables": [
+        {
+          "key": "duration_minutes",
+          "type": "number",
+          "label": {
+            "en": "Outage (minutes)",
+            "fr": "Durée de la panne (minutes)",
+            "de": "Ausfalldauer (Minuten)",
+            "es": "Duración de la caída (minutos)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "query_failed",
+      "label": {
+        "en": "A query fails",
+        "fr": "Une requête échoue",
+        "de": "Eine Abfrage schlägt fehl",
+        "es": "Una consulta falla"
+      },
+      "description": {
+        "en": "Error, time limit, or a value that does not fit its type. Once, until it works again.",
+        "fr": "Erreur, délai dépassé, ou valeur qui ne va pas avec son type. Une fois, jusqu'à ce qu'elle remarche.",
+        "de": "Fehler, Zeitlimit oder ein Wert, der nicht zum Typ passt. Einmal, bis sie wieder klappt.",
+        "es": "Error, tiempo agotado o un valor que no encaja con su tipo. Una vez, hasta que vuelva a funcionar."
       },
       "fields": [
         {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
-        },
-        {
-          "key": "target",
-          "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
-          "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
-          ]
+          "key": "name",
+          "type": "string",
+          "label": {
+            "en": "Query name (empty: any)",
+            "fr": "Nom de la requête (vide : toutes)",
+            "de": "Name der Abfrage (leer: alle)",
+            "es": "Nombre de la consulta (vacío: todas)"
+          },
+          "description": {
+            "en": "Exactly as added.",
+            "fr": "Exactement comme ajouté.",
+            "de": "Genau wie hinzugefügt.",
+            "es": "Exactamente como se añadió."
+          },
+          "required": false
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "name",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Query name",
+            "fr": "Nom de la requête",
+            "de": "Name der Abfrage",
+            "es": "Nombre de la consulta"
+          }
+        },
+        {
+          "key": "error",
+          "type": "string",
+          "label": {
+            "en": "Error",
+            "fr": "Erreur",
+            "de": "Fehler",
+            "es": "Error"
+          }
+        }
+      ]
+    },
+    {
+      "key": "query_back",
+      "label": {
+        "en": "A query works again",
+        "fr": "Une requête remarche",
+        "de": "Eine Abfrage klappt wieder",
+        "es": "Una consulta vuelve a funcionar"
+      },
+      "description": {
+        "en": "After \"A query fails\", the query gives a value again.",
+        "fr": "Après « Une requête échoue », la requête donne de nouveau une valeur.",
+        "de": "Nach „Eine Abfrage schlägt fehl“ liefert die Abfrage wieder einen Wert.",
+        "es": "Después de «Una consulta falla», la consulta vuelve a dar un valor."
+      },
+      "fields": [
+        {
+          "key": "name",
+          "type": "string",
+          "label": {
+            "en": "Query name (empty: any)",
+            "fr": "Nom de la requête (vide : toutes)",
+            "de": "Name der Abfrage (leer: alle)",
+            "es": "Nombre de la consulta (vacío: todas)"
+          },
+          "description": {
+            "en": "Exactly as added.",
+            "fr": "Exactement comme ajouté.",
+            "de": "Genau wie hinzugefügt.",
+            "es": "Exactamente como se añadió."
+          },
+          "required": false
+        }
+      ],
+      "variables": [
+        {
+          "key": "name",
+          "type": "string",
+          "label": {
+            "en": "Query name",
+            "fr": "Nom de la requête",
+            "de": "Name der Abfrage",
+            "es": "Nombre de la consulta"
+          }
+        },
+        {
+          "key": "value",
+          "type": "string",
+          "label": {
+            "en": "Value",
+            "fr": "Valeur",
+            "de": "Wert",
+            "es": "Valor"
+          }
         }
       ]
     }
   ],
   "scene_actions": [
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+      "key": "read_query",
+      "label": {
+        "en": "Read an SQL query now",
+        "fr": "Lire une requête SQL maintenant",
+        "de": "SQL-Abfrage jetzt lesen",
+        "es": "Leer una consulta SQL ahora"
       },
-      "timeout_seconds": 15,
+      "description": {
+        "en": "Runs a saved query, or a SELECT, and gives its value.",
+        "fr": "Exécute une requête enregistrée, ou un SELECT, et donne sa valeur.",
+        "de": "Führt eine gespeicherte Abfrage oder ein SELECT aus und liefert den Wert.",
+        "es": "Ejecuta una consulta guardada, o un SELECT, y da su valor."
+      },
+      "timeout_seconds": 90,
       "fields": [
         {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
+          "key": "query",
+          "type": "string",
+          "label": {
+            "en": "Query name, or SELECT",
+            "fr": "Nom de la requête, ou SELECT",
+            "de": "Name der Abfrage oder SELECT",
+            "es": "Nombre de la consulta, o SELECT"
+          },
+          "description": {
+            "en": "A SELECT is read in its first column.",
+            "fr": "Un SELECT est lu dans sa première colonne.",
+            "de": "Ein SELECT wird aus der ersten Spalte gelesen.",
+            "es": "Un SELECT se lee en su primera columna."
+          },
           "required": true
         }
       ],
       "outputs": [
         {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "key": "value",
+          "type": "number",
+          "label": {
+            "en": "Value (0 if not a number)",
+            "fr": "Valeur (0 si pas un nombre)",
+            "de": "Wert (0, wenn keine Zahl)",
+            "es": "Valor (0 si no es un número)"
+          }
+        },
+        {
+          "key": "text",
+          "type": "string",
+          "label": {
+            "en": "Value, as text",
+            "fr": "Valeur, en texte",
+            "de": "Wert als Text",
+            "es": "Valor, como texto"
+          }
         }
       ]
     }
   ],
   "widgets": [
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "values",
+      "label": {
+        "en": "SQL values",
+        "fr": "Valeurs SQL",
+        "de": "SQL-Werte",
+        "es": "Valores SQL"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "The database, then the last value of each query.",
+        "fr": "La base, puis la dernière valeur de chaque requête.",
+        "de": "Die Datenbank, dann der letzte Wert jeder Abfrage.",
+        "es": "La base de datos, y después el último valor de cada consulta."
+      },
+      "icon": "database",
+      "action_timeout_seconds": 90
     }
   ]
 }
