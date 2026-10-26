@@ -84,6 +84,10 @@ export function registerHandlers(gladys, options = {}) {
   const answered =
     (fn) =>
     async (...args) => {
+      // The start failed (no configuration): say so instead of a TypeError.
+      if (!hub.config) {
+        return INIT_FAILED;
+      }
       try {
         return await fn(...args);
       } catch (err) {

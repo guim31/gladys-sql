@@ -9,12 +9,15 @@
 // -----------------------------------------------------------------------------
 
 import { MAX_QUERY_LENGTH, extractValue } from './queries.js';
-import { ACTION_TEXT, CONNECTION_TEXT, labelled, pick, problemText } from './texts.js';
+import { ACTION_TEXT, CONNECTION_TEXT, INIT_FAILED, labelled, pick, problemText } from './texts.js';
 import { formatValue } from './widgets.js';
 
 export const SCENE_ACTIONS = {
   async read_query(hub, { fields = {} }) {
     const language = hub.config?.language;
+    if (!hub.config) {
+      throw new Error(pick(INIT_FAILED, 'en'));
+    }
     if (!hub.client) {
       throw new Error(pick(hub.connectionStatus?.().message ?? CONNECTION_TEXT.noHost, language));
     }

@@ -85,6 +85,10 @@ const PG_KINDS = {
   '3D000': ERROR_KINDS.DATABASE,
   25006: ERROR_KINDS.READ_ONLY,
   57014: ERROR_KINDS.TIMEOUT,
+  // The server cannot take the connection now: the database, not the query.
+  53300: ERROR_KINDS.UNREACHABLE, // too many connections
+  '57P01': ERROR_KINDS.UNREACHABLE, // shutting down
+  '57P03': ERROR_KINDS.UNREACHABLE, // starting up
 };
 // MariaDB / MySQL error numbers.
 const MYSQL_KINDS = {
@@ -95,6 +99,8 @@ const MYSQL_KINDS = {
   1969: ERROR_KINDS.TIMEOUT, // MariaDB max_statement_time
   3024: ERROR_KINDS.TIMEOUT, // MySQL max_execution_time
   3159: ERROR_KINDS.TLS, // insecure transport refused
+  1040: ERROR_KINDS.UNREACHABLE, // too many connections
+  1203: ERROR_KINDS.UNREACHABLE, // max_user_connections
 };
 
 const oneLine = (text) =>
@@ -113,23 +119,29 @@ export function classify(err) {
   if (typeof code === 'string' && NETWORK_CODES.has(code)) {
     return new SqlError(ERROR_KINDS.UNREACHABLE, `${code}`);
   }
-  if (
-    (typeof code === 'string' && TLS_CODES.has(code)) ||
-    /\bSSL\b|\bTLS\b|certificate/i.test(message)
-  ) {
-    return new SqlError(ERROR_KINDS.TLS, message, message);
-  }
   if (code === 'PROTOCOL_SEQUENCE_TIMEOUT' || /^Query read timeout$/i.test(message)) {
     return new SqlError(ERROR_KINDS.TIMEOUT, message);
   }
-  if (/timeout expired|connection timeout|Connection terminated unexpectedly/i.test(message)) {
-    return new SqlError(ERROR_KINDS.UNREACHABLE, message);
+  // An answer of the server (SQLSTATE, error number) is read by its code
+  // first: "column "certificate" does not exist" is not a TLS problem.
+  const fromServer =
+    Boolean(err?.sqlState) || (typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code));
+  if (!fromServer) {
+    if (
+      (typeof code === 'string' && TLS_CODES.has(code)) ||
+      /\bSSL\b|\bTLS\b|certificate/i.test(message)
+    ) {
+      return new SqlError(ERROR_KINDS.TLS, message, message);
+    }
+    if (/timeout expired|connection timeout|Connection terminated/i.test(message)) {
+      return new SqlError(ERROR_KINDS.UNREACHABLE, message);
+    }
   }
   const kind = PG_KINDS[code] ?? MYSQL_KINDS[err?.errno];
   if (kind) {
     return new SqlError(kind, message, message);
   }
-  if (typeof code === 'string' && (err?.sqlState || /^[0-9A-Z]{5}$/.test(code))) {
+  if (fromServer) {
     return new SqlError(ERROR_KINDS.QUERY, message, message);
   }
   return new SqlError(ERROR_KINDS.UNREACHABLE, message || 'connection failed');
@@ -235,7 +247,15 @@ export class SqlClient {
           await client.query('ROLLBACK').catch(() => {});
         }
       },
-      close: () => client.end().catch(() => {}),
+      // A server gone silent never acknowledges the end: the socket is
+      // destroyed after two seconds.
+      close: () =>
+        Promise.race([
+          client.end().catch(() => {}),
+          new Promise((resolve) => {
+            setTimeout(resolve, 2000).unref?.();
+          }).then(() => client.connection?.stream?.destroy?.()),
+        ]),
     };
   }
 
@@ -264,9 +284,11 @@ export class SqlClient {
       throw classify(err);
     }
     connection.on?.('error', () => {});
-    const run = async (sql, options = {}) => {
+    // Every statement has a client time limit: a network gone silent after
+    // the connection must not hold the read forever.
+    const run = async (sql) => {
       try {
-        const [rows, fields] = await connection.query({ sql, ...options });
+        const [rows, fields] = await connection.query({ sql, timeout: this.timeoutMs + 2000 });
         return { rows, fields };
       } catch (err) {
         throw classify(err);
@@ -289,21 +311,18 @@ export class SqlClient {
       query: async (text) => {
         await run('START TRANSACTION READ ONLY');
         try {
-          const { rows, fields } = await run(text, { timeout: this.timeoutMs + 2000 });
+          const { rows, fields } = await run(text);
           return {
             rows: Array.isArray(rows) ? rows : [],
             columns: (fields ?? []).map((field) => field.name),
           };
         } finally {
-          await connection.query('ROLLBACK').catch(() => {});
+          await run('ROLLBACK').catch(() => {});
         }
       },
+      // Closed without waiting for the server (COM_QUIT needs no answer).
       close: async () => {
-        try {
-          await connection.end();
-        } catch {
-          connection.destroy();
-        }
+        connection.destroy();
       },
     };
   }

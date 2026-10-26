@@ -375,3 +375,55 @@ test('the password never reaches the logs, the messages or the device', async (t
   ]);
   assert.ok(!everything.includes('s3cr3t-pw'));
 });
+
+test('a short outage does not reach the scenes through queries due every tick', async (t) => {
+  const world = await createWorld({ config: configFor('postgres', { poll_interval: '300' }) });
+  t.after(() => world.app.stop());
+  await addQuery(world, { name: 'Fast', query: world.db.sql('count'), interval: '30' });
+  world.db.failure = 'refused';
+  for (let step = 0; step < 16; step += 1) {
+    world.clock.advance(15_000); // four minutes of ticks
+    await world.hub.readDue();
+  }
+  assert.equal(world.hub.failedReads, 1);
+  assert.deepEqual(world.fake.sceneEvents, []);
+  // The second read, at the interval of the configuration.
+  world.clock.advance(120_000);
+  await world.hub.readDue();
+  assert.equal(world.fake.sceneEvents.at(-1).key, TRIGGERS.DATABASE_DOWN);
+});
+
+test('a fixed password ends the outage with "The database answers again"', async (t) => {
+  const world = await createWorld();
+  t.after(() => world.app.stop());
+  world.db.failure = 'auth';
+  world.clock.advance(60_000);
+  await world.hub.readDue();
+  world.clock.advance(60_000);
+  await world.hub.readDue();
+  assert.equal(world.fake.sceneEvents.at(-1).data.error_kind, 'auth');
+  world.db.failure = null;
+  await world.fake.configUpdated(configFor('postgres', { password: 'fixed' }));
+  assert.equal(world.fake.sceneEvents.at(-1).key, TRIGGERS.DATABASE_UP);
+});
+
+test('another database after a restart does not end the outage of the old one', async (t) => {
+  const clock = createClock();
+  const world = await createWorld({ clock });
+  world.db.failure = 'refused';
+  world.clock.advance(60_000);
+  await world.hub.readDue();
+  world.clock.advance(60_000);
+  await world.hub.readDue();
+  assert.equal(world.fake.sceneEvents.length, 1);
+  await world.app.stop();
+  world.db.failure = null;
+  const again = await createWorld({
+    clock,
+    dataDir: world.dataDir,
+    db: world.db,
+    config: configFor('postgres', { host: '192.0.2.30' }),
+  });
+  t.after(() => again.app.stop());
+  assert.deepEqual(again.fake.sceneEvents, []);
+});

@@ -187,7 +187,9 @@ now() - interval '1 day'`), ou augmentez le délai maximal.
 
 - Une base par installation, 20 requêtes ; une valeur par requête (la
   première ligne).
-- Lecture seule : rien n'est jamais écrit dans la base.
+- Lecture seule : rien n'est jamais écrit dans la base. Une barre oblique
+  inverse (`\`) est refusée dans une requête : son sens dépend des réglages du
+  serveur.
 - PostgreSQL, MariaDB et MySQL seulement (ni SQL Server, ni Oracle, ni
   SQLite).
 - Les requêtes sont gardées dans le volume de données de l'intégration : la

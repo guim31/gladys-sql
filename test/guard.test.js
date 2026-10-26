@@ -115,15 +115,59 @@ test('what the scanner cannot be sure of is refused', () => {
   assert.equal(checkReadOnly('SELECT 1 /*M!100000 x */', 'mysql').error, E.UNTERMINATED);
 });
 
-test('backslash escapes follow the engine', () => {
-  // MySQL: \' does not close the string; the ";" stays inside.
-  assert.ok(checkReadOnly("SELECT 'a\\'; DROP TABLE t; '", 'mysql').sql);
-  // PostgreSQL (standard strings): \ is a plain character, the string closes
-  // after it and the ";" is code.
-  assert.equal(checkReadOnly("SELECT 'a\\' ; SELECT ';'", 'postgres').error, E.MULTIPLE);
-  // PostgreSQL E'…' strings do escape.
-  assert.ok(checkReadOnly("SELECT E'a\\'; DROP TABLE t; '", 'postgres').sql);
+test('a backslash is refused: its meaning depends on the server settings', () => {
+  for (const engine of both) {
+    for (const text of [
+      "SELECT 'a\\'; DROP TABLE t; '",
+      "SELECT E'a\\'; DROP TABLE t; '",
+      "SELECT 'x\\', LOAD_FILE('/etc/passwd') -- '",
+      'SELECT "a\\" , LOAD_FILE(0x2f) -- "',
+    ]) {
+      assert.equal(checkReadOnly(text, engine).error, E.BACKSLASH, `${engine}: ${text}`);
+    }
+  }
   // Nested block comments are a PostgreSQL feature.
   assert.ok(checkReadOnly('SELECT 1 /* a /* b */ ; */', 'postgres').sql);
   assert.equal(checkReadOnly('SELECT 1 /* a /* b */ ; */', 'mysql').error, E.MULTIPLE);
+});
+
+test('the bypasses found in review are refused', () => {
+  // MySQL ends "--" comments on any control character, not only a space.
+  for (const control of ['\x0b', '\x01', '\x0c']) {
+    const text = `SELECT 1 --${control} '\n, LOAD_FILE('/etc/passwd') -- '`;
+    assert.equal(checkReadOnly(text, 'mysql').error, E.FORBIDDEN, JSON.stringify(text));
+    const outfile = `SELECT 1 --${control} '\n, 1 INTO OUTFILE '/tmp/x' -- '`;
+    assert.equal(checkReadOnly(outfile, 'mysql').error, E.FORBIDDEN);
+  }
+  // PostgreSQL: non-ASCII dollar tags, identifiers ending in $, before E'.
+  assert.deepEqual(
+    checkReadOnly("SELECT $é$'$é$, pg_read_file('/etc/passwd'), $é$'$é$", 'postgres'),
+    {
+      error: E.FORBIDDEN,
+      word: 'PG_READ_FILE',
+    },
+  );
+  assert.equal(
+    checkReadOnly("SELECT 1 AS é$$, pg_read_file('/etc/passwd') AS é$$", 'postgres').error,
+    E.FORBIDDEN,
+  );
+  assert.ok(checkReadOnly('SELECT $é$a;b$é$', 'postgres').sql);
+  // Function families, not single names.
+  for (const word of [
+    'dblink_connect',
+    'dblink_send_query',
+    'pg_try_advisory_lock',
+    'pg_advisory_lock_shared',
+    'pg_stat_reset',
+    'pg_ls_logdir',
+    'pg_ls_waldir',
+    'pg_stat_file',
+    'pg_file_write',
+    'lo_create',
+  ]) {
+    assert.equal(checkReadOnly(`SELECT ${word}('x')`, 'postgres').error, E.FORBIDDEN, word);
+  }
+  // Astral characters do not shift the scanner.
+  assert.equal(checkReadOnly("SELECT '😀', 1; DROP TABLE t", 'postgres').error, E.MULTIPLE);
+  assert.ok(checkReadOnly("SELECT '😀;' AS x", 'mysql').sql);
 });

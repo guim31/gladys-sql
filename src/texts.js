@@ -126,6 +126,12 @@ export const GUARD_TEXT = {
     de: 'dieses Wort schreibt oder sperrt, es wird abgelehnt:',
     es: 'esta palabra escribe o bloquea, se rechaza:',
   },
+  [GUARD_ERRORS.BACKSLASH]: {
+    en: 'a backslash \\ is refused (its meaning depends on the server)',
+    fr: 'une barre oblique inverse \\ est refusée (son sens dépend du serveur)',
+    de: 'ein Backslash \\ wird abgelehnt (seine Bedeutung hängt vom Server ab)',
+    es: 'se rechaza una barra invertida \\ (su sentido depende del servidor)',
+  },
   [GUARD_ERRORS.UNTERMINATED]: {
     en: 'a quote or a comment is not closed',
     fr: "un guillemet ou un commentaire n'est pas fermé",
@@ -178,6 +184,7 @@ export const REPORT_TEXT = {
     tooMany: (max) => `${max} queries at most: remove one first.`,
     refused: (detail) => `Query refused: ${detail}`,
     noQuery: 'no query yet: use "Add a query"',
+    retry: 'The configuration changed meanwhile: add the query again.',
   },
   fr: {
     ok: 'OK',
@@ -192,6 +199,7 @@ export const REPORT_TEXT = {
     tooMany: (max) => `${max} requêtes au plus : supprimez-en une d'abord.`,
     refused: (detail) => `Requête refusée : ${detail}`,
     noQuery: 'aucune requête : utilisez « Ajouter une requête »',
+    retry: 'La configuration a changé entre-temps : ajoutez de nouveau la requête.',
   },
   de: {
     ok: 'OK',
@@ -206,6 +214,7 @@ export const REPORT_TEXT = {
     tooMany: (max) => `Höchstens ${max} Abfragen: Entferne zuerst eine.`,
     refused: (detail) => `Abfrage abgelehnt: ${detail}`,
     noQuery: 'noch keine Abfrage: Nutze „Abfrage hinzufügen“',
+    retry: 'Die Konfiguration hat sich inzwischen geändert: Füge die Abfrage erneut hinzu.',
   },
   es: {
     ok: 'OK',
@@ -220,6 +229,7 @@ export const REPORT_TEXT = {
     tooMany: (max) => `${max} consultas como máximo: elimine una antes.`,
     refused: (detail) => `Consulta rechazada: ${detail}`,
     noQuery: 'ninguna consulta: use «Añadir una consulta»',
+    retry: 'La configuración ha cambiado mientras tanto: añada de nuevo la consulta.',
   },
 };
 

@@ -8,8 +8,8 @@
 // identifiers, comments and (PostgreSQL) dollar quotes are blanked out, so a
 // `;` or a keyword inside them is not code, and one outside them cannot hide
 // inside something the scanner took for a literal. Anything the scanner is
-// not sure of (an unterminated literal, a MySQL executable comment `/*! … */`)
-// is refused.
+// not sure of (an unterminated literal, a MySQL executable comment `/*! … */`,
+// a backslash, whose meaning depends on server settings) is refused.
 // -----------------------------------------------------------------------------
 
 export const GUARD_ERRORS = Object.freeze({
@@ -18,49 +18,70 @@ export const GUARD_ERRORS = Object.freeze({
   MULTIPLE: 'multiple',
   FORBIDDEN: 'forbidden',
   UNTERMINATED: 'unterminated',
+  BACKSLASH: 'backslash',
 });
 
 // Words that write, lock, or reach outside the database, even inside a
 // SELECT: data-modifying CTEs (PostgreSQL), SELECT … INTO (a new table, or a
 // file with MySQL), FOR UPDATE / FOR SHARE locks, and the functions that act
-// on the server rather than read data.
+// on the server rather than read data — some of them escape the read-only
+// transaction (a file read or written, another session through dblink, a
+// backend stopped). A name ending in `*` covers the family (`\w` includes
+// `_`: `dblink` alone would let `dblink_connect` through).
+const FORBIDDEN_WORDS = [
+  'insert',
+  'update',
+  'delete',
+  'merge',
+  'into',
+  'outfile',
+  'dumpfile',
+  'share',
+  'lock',
+  'nextval',
+  'setval',
+  'set_config',
+  'dblink*',
+  'lo_*',
+  'pg_advisory*',
+  'pg_try_advisory*',
+  'pg_cancel_backend',
+  'pg_terminate_backend',
+  'pg_reload_conf',
+  'pg_rotate_logfile',
+  'pg_read*',
+  'pg_file_*',
+  'pg_ls_*',
+  'pg_stat_file',
+  'pg_stat_reset*',
+  'pg_logdir_ls',
+  'pg_log_*',
+  'pg_switch_wal',
+  'pg_create_*',
+  'pg_drop_*',
+  'pg_replication_*',
+  'pg_promote',
+  'pg_notify',
+  'load_file',
+  'get_lock',
+  'release_lock',
+  'release_all_locks',
+  'benchmark',
+  'sys_exec',
+  'sys_eval',
+];
 const FORBIDDEN = new RegExp(
-  `\\b(${[
-    'insert',
-    'update',
-    'delete',
-    'merge',
-    'into',
-    'outfile',
-    'dumpfile',
-    'share',
-    'lock',
-    'nextval',
-    'setval',
-    'set_config',
-    'pg_terminate_backend',
-    'pg_cancel_backend',
-    'pg_reload_conf',
-    'pg_rotate_logfile',
-    'pg_read_file',
-    'pg_read_binary_file',
-    'pg_ls_dir',
-    'pg_advisory_lock',
-    'pg_advisory_xact_lock',
-    'lo_import',
-    'lo_export',
-    'lo_unlink',
-    'dblink',
-    'dblink_exec',
-    'load_file',
-    'get_lock',
-    'release_lock',
-    'benchmark',
-  ].join('|')})\\b`,
+  `\\b(${FORBIDDEN_WORDS.map((word) => word.replace('*', '\\w*')).join('|')})\\b`,
   'i',
 );
 
-const isSpace = (char) => char === ' ' || char === '\t' || char === '\n' || char === '\r';
+// Characters of an unquoted identifier: PostgreSQL accepts any non-ASCII
+// letter, and `$` after the first character.
+const IDENTIFIER = /[A-Za-z0-9_$\u0080-￿]/;
+const DOLLAR_TAG = /^\$(?:[A-Za-z_\u0080-￿][A-Za-z0-9_\u0080-￿]*)?\$/;
+
+// MySQL ends a "-- " comment on any space or control character after "--".
+const endsDashes = (char) => char === undefined || char.charCodeAt(0) <= 0x20;
 
 /**
  * The code of `text` with every literal, quoted identifier and comment
@@ -70,7 +91,8 @@ const isSpace = (char) => char === ' ' || char === '\t' || char === '\n' || char
  * @returns {string|null} null when a literal or comment is not terminated
  */
 export function blankLiterals(text, engine) {
-  const out = [...text];
+  // UTF-16 units, as the indices below (not code points).
+  const out = text.split('');
   const blank = (from, to) => {
     for (let at = from; at < to; at += 1) {
       out[at] = out[at] === '\n' ? '\n' : ' ';
@@ -83,9 +105,7 @@ export function blankLiterals(text, engine) {
     const next = text[at + 1];
     // Line comments: MySQL needs a space (or control) after "--".
     if (
-      (char === '-' &&
-        next === '-' &&
-        (!mysql || at + 2 >= text.length || isSpace(text[at + 2]))) ||
+      (char === '-' && next === '-' && (!mysql || endsDashes(text[at + 2]))) ||
       (mysql && char === '#')
     ) {
       const end = text.indexOf('\n', at);
@@ -122,9 +142,9 @@ export function blankLiterals(text, engine) {
     }
     // PostgreSQL dollar quotes: $$ … $$ or $tag$ … $tag$ (not $1, a parameter).
     if (!mysql && char === '$') {
-      const tag = text.slice(at).match(/^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/)?.[0];
+      const tag = text.slice(at).match(DOLLAR_TAG)?.[0];
       const previous = text[at - 1];
-      if (tag && !(previous && /[A-Za-z0-9_]/.test(previous))) {
+      if (tag && !(previous && IDENTIFIER.test(previous))) {
         const end = text.indexOf(tag, at + tag.length);
         if (end === -1) {
           return null;
@@ -136,20 +156,10 @@ export function blankLiterals(text, engine) {
     }
     const quoted = char === "'" || char === '"' || (mysql && char === '`');
     if (quoted) {
-      // Backslash escapes: always in MySQL strings, in PostgreSQL E'…' only.
-      const escapes = mysql
-        ? char !== '`'
-        : char === "'" &&
-          /[eE]/.test(text[at - 1] ?? '') &&
-          !/[A-Za-z0-9_]/.test(text[at - 2] ?? '');
       let cursor = at + 1;
       let closed = false;
       while (cursor < text.length) {
         const current = text[cursor];
-        if (escapes && current === '\\') {
-          cursor += 2;
-          continue;
-        }
         if (current === char) {
           if (text[cursor + 1] === char) {
             cursor += 2; // doubled quote
@@ -181,6 +191,12 @@ export function blankLiterals(text, engine) {
  */
 export function checkReadOnly(text, engine) {
   const source = typeof text === 'string' ? text : '';
+  // A backslash escapes a quote or not depending on server settings
+  // (NO_BACKSLASH_ESCAPES, standard_conforming_strings, E'…'): the guard could
+  // not know where a literal ends. Refused anywhere.
+  if (source.includes('\\')) {
+    return { error: GUARD_ERRORS.BACKSLASH };
+  }
   const code = blankLiterals(source, engine);
   if (code === null) {
     return { error: GUARD_ERRORS.UNTERMINATED };

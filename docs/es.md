@@ -190,7 +190,9 @@ now() - interval '1 day'`), o aumente el tiempo máximo.
 
 - Una base de datos por instalación, 20 consultas; un valor por consulta (la
   primera fila).
-- Solo lectura: nunca se escribe nada en la base de datos.
+- Solo lectura: nunca se escribe nada en la base de datos. Se rechaza una
+  barra invertida (`\`) en una consulta: su sentido depende de los ajustes del
+  servidor.
 - Solo PostgreSQL, MariaDB y MySQL (ni SQL Server, ni Oracle, ni SQLite).
 - Las consultas se guardan en el volumen de datos de la integración:
   reinstalarla desde cero las pierde (añádalas de nuevo con los mismos

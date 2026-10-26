@@ -190,7 +190,9 @@ erstellt > now() - interval '1 day'`) oder erhöhe das Zeitlimit.
 
 - Eine Datenbank pro Installation, 20 Abfragen; ein Wert pro Abfrage (die
   erste Zeile).
-- Nur lesend: Es wird nie etwas in die Datenbank geschrieben.
+- Nur lesend: Es wird nie etwas in die Datenbank geschrieben. Ein Backslash
+  (`\`) wird in einer Abfrage abgelehnt: Seine Bedeutung hängt von den
+  Servereinstellungen ab.
 - Nur PostgreSQL, MariaDB und MySQL (weder SQL Server noch Oracle noch
   SQLite).
 - Die Abfragen liegen im Datenvolume der Integration: Eine Neuinstallation von

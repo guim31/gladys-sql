@@ -179,7 +179,8 @@ interval '1 day'`), or raise the time limit.
 
 - One database per installation, 20 queries; one value per query (the first
   row).
-- Read only: nothing is ever written into the database.
+- Read only: nothing is ever written into the database. A backslash (`\`)
+  is refused in a query: its meaning depends on the server settings.
 - PostgreSQL, MariaDB and MySQL only (not SQL Server, Oracle or SQLite).
 - The queries are stored in the data volume of the integration: reinstalling
   it from scratch loses them (add them again with the same names: same

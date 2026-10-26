@@ -251,7 +251,12 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
   côté MariaDB / MySQL), annulée par `ROLLBACK` ; l'utilisateur en lecture seule de la doc. Le garde-fou lit
   le texte comme le serveur (littéraux, identifiants entre guillemets, commentaires, dollar-quotes PG,
   `\` échappé seulement en MySQL et dans les `E'…'` PG, `-- ` avec espace en MySQL) et refuse ce dont il
-  n'est pas sûr (`/*! … */` exécuté par MySQL, littéral non fermé).
+  n'est pas sûr (`/*! … */` exécuté par MySQL, littéral non fermé, **toute barre oblique inverse** : son sens
+  dépend de `NO_BACKSLASH_ESCAPES` / `standard_conforming_strings`). Pièges relevés en relecture : MySQL
+  termine un `--` sur **tout caractère de contrôle** (pas seulement l'espace) ; PostgreSQL accepte des
+  lettres non ASCII et `$` dans les identifiants et les étiquettes de dollar-quote ; les fonctions se
+  bloquent **par famille** (`dblink*`, `pg_ls_*`, `lo_*`…), `\b` voyant `_` comme une lettre ; certaines
+  (`pg_read_file`, `dblink`, `LOAD_FILE`, `INTO OUTFILE`) échappent à la transaction en lecture seule.
 - **PostgreSQL** : `pg` en protocole étendu (`queryMode: 'extended'`), qui refuse une deuxième instruction ;
   sans `values`, `pg` passe sinon en protocole simple, qui les accepte. `statement_timeout` côté serveur,
   `query_timeout` côté client (+2 s).
@@ -262,6 +267,9 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Erreurs réelles relevées : MySQL et MariaDB répondent `1044` (pas `1049`) pour une base inconnue quand
   l'utilisateur n'a de droit sur aucune base de ce nom ; écrire dans une transaction en lecture seule donne
   `25006` (PG) et `1792` (MariaDB, MySQL). Un `SET` via `mysql2` n'a pas de `fields` (`undefined`).
+- Classer une erreur d'abord par son code serveur (SQLSTATE, errno) : un message « column "certificate" »
+  n'est pas une erreur TLS. Une base en panne n'est relue qu'à l'intervalle de la configuration, sinon les
+  requêtes dues à chaque tick (15 s) atteignent `DOWN_AFTER_READS` en 30 s.
 - Une connexion par lecture, fermée aussitôt (pas de pool) : pas de connexion orpheline entre deux lectures,
   un délai dépassé n'empoisonne pas la suivante.
 - Un seul appareil, d'identifiant fixe (`database:main`) : changer d'hôte garde l'historique. Une

@@ -103,6 +103,31 @@ test('real errors are sorted into kinds', () => {
     assert.equal(connect('refused'), K.UNREACHABLE, `${server} refused`);
   }
   assert.equal(classify(new Error('timeout expired')).kind, K.UNREACHABLE);
+  // A query error that names a column "certificate" or "ssl" stays a query error.
+  const pgColumn = { code: '42703', message: 'column "certificate" does not exist' };
+  assert.equal(classify(Object.assign(new Error(), pgColumn)).kind, K.QUERY);
+  const myColumn = {
+    code: 'ER_BAD_FIELD_ERROR',
+    errno: 1054,
+    sqlState: '42S22',
+    message: "Unknown column 'ssl' in 'field list'",
+  };
+  assert.equal(classify(Object.assign(new Error(), myColumn)).kind, K.QUERY);
+  // The server cannot take one more connection: the database, not the query.
+  assert.equal(
+    classify(Object.assign(new Error('too many'), { code: '53300' })).kind,
+    K.UNREACHABLE,
+  );
+  assert.equal(
+    classify(
+      Object.assign(new Error('x'), {
+        errno: 1203,
+        sqlState: '42000',
+        code: 'ER_TOO_MANY_USER_CONNECTIONS',
+      }),
+    ).kind,
+    K.UNREACHABLE,
+  );
   assert.equal(classify(new Error('The server does not support SSL connections')).kind, K.TLS);
   assert.equal(classify(Object.assign(new Error('x'), { code: 'ETIMEDOUT' })).kind, K.UNREACHABLE);
   assert.equal(

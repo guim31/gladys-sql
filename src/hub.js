@@ -55,8 +55,6 @@ export const TRIGGERS = Object.freeze({
 export const HUB_TIMINGS = {
   // The timer looks for due reads this often.
   tickMs: 15_000,
-  // A scene action or the widget reads again when the last read is older.
-  freshMs: 15_000,
   // An unchanged value is sent again this often: Gladys marks a value older
   // than 48 h as outdated.
   heartbeatMs: 6 * 3600_000,
@@ -68,6 +66,10 @@ export const DOWN_AFTER_READS = 2;
 const QUERY_CONCURRENCY = 3;
 // A read is due slightly early: the timer does not drift by one tick.
 const EARLY_MS = 1000;
+
+/** The database itself: another one does not end the outage of this one. */
+const placeKey = (config) =>
+  JSON.stringify([config.engine, config.host, config.port, config.database]);
 
 const signature = (config) =>
   JSON.stringify([
@@ -151,7 +153,12 @@ export class SqlHub {
     }
     const events = saved.events ?? {};
     this.events = {
-      down: Number.isFinite(events.down?.since) ? { since: events.down.since } : null,
+      // An outage of another database (changed while the container was
+      // stopped) is not ended by this one.
+      down:
+        Number.isFinite(events.down?.since) && events.down.place === placeKey(config)
+          ? { since: events.down.since, place: events.down.place }
+          : null,
       failing: events.failing && typeof events.failing === 'object' ? events.failing : {},
     };
     if (this.queries.size > 0) {
@@ -172,7 +179,9 @@ export class SqlHub {
 
   async reconfigure(config) {
     const changed = this.signature !== signature(config);
-    const otherServer = changed && this.signature !== null;
+    // A new password or TLS option is the same database: its outage ends
+    // with "The database answers again".
+    const otherServer = this.signature !== null && placeKey(this.config) !== placeKey(config);
     const previousLanguage = this.config?.language;
     this.config = config;
     if (changed) {
@@ -268,13 +277,6 @@ export class SqlHub {
     await this.readDue({ all: true });
   }
 
-  /** Read again when the last read is older than `freshMs` (scene actions, widget). */
-  async refreshIfStale() {
-    if (this.client && this.now() - this.checkedAt >= this.timings.freshMs) {
-      await this.readDue({ all: true });
-    }
-  }
-
   /**
    * Read and apply what changed. Concurrent calls share the read; a call
    * for everything waits for a partial read and reads again.
@@ -290,7 +292,10 @@ export class SqlHub {
     if (!this.polling) {
       const serverDue = this.now() - this.checkedAt >= this.config.pollIntervalMs - EARLY_MS;
       const due = this.dueQueries(all);
-      if (!all && !serverDue && due.length === 0) {
+      // A database that does not answer is tried again at the interval of
+      // the configuration only: a restart of a few seconds does not reach
+      // DOWN_AFTER_READS through the queries due every tick.
+      if (!all && !serverDue && (due.length === 0 || this.error)) {
         return Promise.resolve(false);
       }
       this.pollingGeneration = this.generation;
@@ -420,7 +425,7 @@ export class SqlHub {
         error_kind: this.error.kind,
       });
       if (accepted) {
-        this.events.down = { since: this.downSince ?? this.now() };
+        this.events.down = { since: this.downSince ?? this.now(), place: placeKey(this.config) };
         this.save();
       }
     } else if (!this.error && this.events.down) {
@@ -746,8 +751,16 @@ export class SqlHub {
     }
     let result;
     try {
+      const { client } = this;
       result = await this.runQuery(query);
+      if (client !== this.client) {
+        // The configuration changed during the check: another database.
+        throw new AnswerError(inEveryLanguage((language) => REPORT_TEXT[language].retry));
+      }
     } catch (err) {
+      if (err instanceof AnswerError) {
+        throw err;
+      }
       // The database does not answer: the query cannot be checked, refuse it.
       throw new AnswerError(
         inEveryLanguage((language) =>
